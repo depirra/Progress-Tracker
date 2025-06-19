@@ -1,5 +1,5 @@
 <?php
-// File: action.php (Versi Final Lengkap)
+// File: action.php (Versi Final Lengkap - Mencakup Semua Fitur)
 
 require_once 'config/database.php';
 session_start();
@@ -15,7 +15,9 @@ if (isset($_POST['form_action'])) {
 
     switch ($action) {
         
-        // --- AKSI LOGIN ---
+        // ==========================================================
+        // AKSI LOGIN
+        // ==========================================================
         case 'login_user':
             $username = $_POST['username'];
             $password = $_POST['password'];
@@ -24,7 +26,7 @@ if (isset($_POST['form_action'])) {
             $stmt->execute([$username]);
             $user = $stmt->fetch();
 
-            // Menggunakan perbandingan teks biasa karena ini adalah permintaan untuk tugas kuliah
+            // Menggunakan perbandingan teks biasa sesuai keputusan kita untuk tugas kuliah
             if ($user && $password === $user['password']) {
                 // Simpan data user ke session
                 $_SESSION['user_id'] = $user['id'];
@@ -42,82 +44,145 @@ if (isset($_POST['form_action'])) {
             }
             break;
 
-        // --- AKSI PROYEK ---
+        // ==========================================================
+        // AKSI-AKSI PROYEK
+        // ==========================================================
         case 'save_project':
-            // Hanya admin dan engineer yang bisa menyimpan proyek
             if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'engineer')) {
-                $title = $_POST['projectTitle'];
-                $detail = $_POST['projectDetail'];
-                $status = $_POST['statusInput'];
-                $projectId = $_POST['projectId'] ?? null;
-                $progressMap = ["Perencanaan" => 10, "Persiapan" => 30, "Produksi" => 60, "Pengawasan" => 75, "Penyelesaian" => 100];
-                $progress = $progressMap[$status] ?? 0;
                 
-                if ($projectId) { // Jika ada projectId, berarti ini UPDATE
-                    $sql = "UPDATE projects SET title = ?, detail = ?, status = ?, progress = ? WHERE id = ?";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$title, $detail, $status, $progress, $projectId]);
-                } else { // Jika tidak ada, berarti ini INSERT baru
-                    $created_by = $_SESSION['user_id'];
-                    $sql = "INSERT INTO projects (title, detail, status, progress, created_by) VALUES (?, ?, ?, ?, ?)";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$title, $detail, $status, $progress, $created_by]);
+                $pdo->beginTransaction();
+                try {
+                    $title = $_POST['projectTitle'];
+                    $detail = $_POST['projectDetail'];
+                    $status = $_POST['statusInput'];
+                    $client_id = !empty($_POST['client_id']) ? $_POST['client_id'] : null;
+                    $projectId = $_POST['projectId'] ?? null;
+                    $progressMap = ["Perencanaan" => 10, "Persiapan" => 30, "Produksi" => 60, "Pengawasan" => 75, "Penyelesaian" => 100];
+                    $progress = $progressMap[$status] ?? 0;
+                    $currentProjectId = null;
+
+                    if ($projectId) { // UPDATE PROYEK LAMA
+                        $sql = "UPDATE projects SET title = ?, detail = ?, status = ?, progress = ?, client_id = ? WHERE id = ?";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute([$title, $detail, $status, $progress, $client_id, $projectId]);
+                        $currentProjectId = $projectId;
+                    } else { // INSERT PROYEK BARU
+                        $created_by = $_SESSION['user_id'];
+                        $sql = "INSERT INTO projects (title, detail, status, progress, created_by, client_id) VALUES (?, ?, ?, ?, ?, ?)";
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute([$title, $detail, $status, $progress, $created_by, $client_id]);
+                        $currentProjectId = $pdo->lastInsertId();
+                    }
+
+                    // Logika untuk upload file lampiran
+                    if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
+                        $note = $_POST['attachment_note'] ?? '';
+                        $uploaded_by = $_SESSION['user_id'];
+                        $target_dir = "uploads/";
+                        if (!is_dir($target_dir)) { mkdir($target_dir, 0755, true); }
+                        
+                        $original_name = basename($_FILES["attachment_file"]["name"]);
+                        $file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+                        $allowed_formats = ['jpg', 'jpeg', 'png', 'gif'];
+                        if (!in_array($file_extension, $allowed_formats)) { throw new Exception("Format file tidak diizinkan."); }
+
+                        $safe_filename = preg_replace('/[^A-Za-z0-9\-\._]/', '', pathinfo($original_name, PATHINFO_FILENAME));
+                        $unique_filename = $safe_filename . '-' . uniqid() . '.' . $file_extension;
+                        $target_file = $target_dir . $unique_filename;
+
+                        if (move_uploaded_file($_FILES["attachment_file"]["tmp_name"], $target_file)) {
+                            $stmtAttachment = $pdo->prepare("INSERT INTO attachments (project_id, filename, filepath, note, uploaded_by) VALUES (?, ?, ?, ?, ?)");
+                            $stmtAttachment->execute([$currentProjectId, $original_name, $target_file, $note, $uploaded_by]);
+                        } else { throw new Exception("Gagal mengupload file."); }
+                    }
+                    $pdo->commit();
+                } catch (Exception $e) {
+                    $pdo->rollBack();
+                    die("Terjadi kesalahan saat menyimpan proyek: " . $e->getMessage());
                 }
             }
             header('Location: projects.php');
             break;
 
         case 'delete_project':
-            // Hanya admin dan engineer yang bisa menghapus proyek
             if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'engineer')) {
                 if (isset($_POST['project_id'])) {
                     $projectId = $_POST['project_id'];
-                    $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ?");
-                    $stmt->execute([$projectId]);
+                    $pdo->beginTransaction();
+                    try {
+                        $stmt_get_attachments = $pdo->prepare("SELECT filepath FROM attachments WHERE project_id = ?");
+                        $stmt_get_attachments->execute([$projectId]);
+                        $files_to_delete = $stmt_get_attachments->fetchAll(PDO::FETCH_COLUMN);
+                        foreach ($files_to_delete as $filepath) {
+                            if (file_exists($filepath)) {
+                                unlink($filepath);
+                            }
+                        }
+                        $stmt_delete_attachments = $pdo->prepare("DELETE FROM attachments WHERE project_id = ?");
+                        $stmt_delete_attachments->execute([$projectId]);
+                        $stmt_delete_project = $pdo->prepare("DELETE FROM projects WHERE id = ?");
+                        $stmt_delete_project->execute([$projectId]);
+                        $pdo->commit();
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        die("Gagal menghapus proyek: " . $e->getMessage());
+                    }
                 }
             }
             header('Location: projects.php');
             break;
 
-        // --- AKSI PENGGUNA ---
+        // ==========================================================
+        // AKSI-AKSI PENGGUNA
+        // ==========================================================
         case 'save_user':
-            // Hanya admin yang bisa menyimpan pengguna
             if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                 $userId = $_POST['user_id'] ?? null;
                 $nama_lengkap = $_POST['fullName'];
                 $username = $_POST['newUsername'];
                 $password = $_POST['newPassword'];
                 $role = $_POST['userRoleSelect'];
-                $client_id = ($role === 'client') ? $_POST['clientSelect'] : null;
 
                 if ($userId) { // Operasi UPDATE
-                    $sql = "UPDATE users SET nama_lengkap = ?, username = ?, role = ?, client_id = ?";
-                    $params = [$nama_lengkap, $username, $role, $client_id];
-                    // Hanya update password jika kolomnya diisi
+                    $sql = "UPDATE users SET nama_lengkap = ?, username = ?, role = ?";
+                    $params = [$nama_lengkap, $username, $role];
                     if (!empty($password)) {
                         $sql .= ", password = ?";
-                        $params[] = $password; // Simpan sebagai teks biasa
+                        $params[] = $password;
                     }
                     $sql .= " WHERE id = ?";
                     $params[] = $userId;
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params);
-
-                } else { // Operasi INSERT
-                    if (empty($password)) die("Password wajib diisi untuk pengguna baru.");
-                    $sql = "INSERT INTO users (nama_lengkap, username, password, role, client_id) VALUES (?, ?, ?, ?, ?)";
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute([$nama_lengkap, $username, $password, $role, $client_id]);
+                } else { // Operasi INSERT PENGGUNA BARU
+                    try {
+                        $pdo->beginTransaction();
+                        $client_id = null;
+                        if ($role === 'client') {
+                            $alamat = $_POST['alamatClient'];
+                            $kontak = $_POST['kontakClient'];
+                            $email = $_POST['emailClient'];
+                            $stmtClient = $pdo->prepare("INSERT INTO clients (nama, alamat, kontak, email) VALUES (?, ?, ?, ?)");
+                            $stmtClient->execute([$nama_lengkap, $alamat, $kontak, $email]);
+                            $client_id = $pdo->lastInsertId();
+                        }
+                        if (empty($password)) die("Password wajib diisi untuk pengguna baru.");
+                        $sql = "INSERT INTO users (nama_lengkap, username, password, role, client_id) VALUES (?, ?, ?, ?, ?)";
+                        $stmtUser = $pdo->prepare($sql);
+                        $stmtUser->execute([$nama_lengkap, $username, $password, $role, $client_id]);
+                        $pdo->commit();
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        die("Gagal menyimpan pengguna baru: " . $e->getMessage());
+                    }
                 }
             }
             header('Location: users.php');
             break;
 
         case 'delete_user':
-            // Hanya admin yang bisa menghapus pengguna
             if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                 $userId = $_POST['user_id'];
-                // Mencegah admin menghapus dirinya sendiri
                 if ($userId != $_SESSION['user_id']) {
                     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
                     $stmt->execute([$userId]);
@@ -126,7 +191,7 @@ if (isset($_POST['form_action'])) {
             header('Location: users.php');
             break;
 
-        // Aksi default jika tidak ada yang cocok
+        // Aksi default
         default:
             header('Location: dashboard.php');
             break;

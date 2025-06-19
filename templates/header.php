@@ -1,8 +1,7 @@
 <?php
-// File: templates/header.php (VERSI FINAL & BERSIH)
+// File: templates/header.php (Versi Link Langsung)
 session_start();
 
-// Keamanan: Jika user belum login (dan tidak sedang di halaman login), tendang keluar.
 if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {
     header('Location: login.php');
     exit();
@@ -20,7 +19,7 @@ if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php
 </head>
 <body>
 <div class="app-container active">
-    <?php if (isset($_SESSION['user_id'])): // Tampilkan sidebar hanya jika sudah login ?>
+    <?php if (isset($_SESSION['user_id'])): ?>
     <div class="sidebar">
         <div class="sidebar-logo">PT Sinar Baja Bumi</div>
         <div class="sidebar-menu">

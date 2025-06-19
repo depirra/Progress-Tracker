@@ -1,29 +1,38 @@
 <?php
-// File: pages/users.php (Versi Final dengan Layout Tombol Diperbaiki)
+// File: pages/users.php (Versi Final dengan Search Bar)
 
+// Memanggil file-file konfigurasi dan template.
 require_once 'config/database.php';
 require_once 'templates/header.php';
 
-// --- BLOK KEAMANAN AKSES HALAMAN ---
+// --- BAGIAN 1: GERBANG KEAMANAN ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     die('<div class="page-header"></div><div class="view active"><div class="view-content"><div class="info">Akses Ditolak. Halaman ini hanya untuk Admin.</div></div></div>');
 }
 
-// --- BAGIAN 1: LOGIKA PENCARIAN & PENGAMBILAN DATA ---
+// ==================================================================
+// BAGIAN 2: LOGIKA PENCARIAN & PENGAMBILAN DATA
+// ==================================================================
+
+// Ambil kata kunci pencarian dari URL, jika ada.
 $searchTerm = $_GET['search'] ?? '';
+
+// Query SQL dasar
 $sql = "SELECT u.*, c.nama as client_name FROM users u LEFT JOIN clients c ON u.client_id = c.id";
 $params = [];
+
+// Jika ada kata kunci pencarian, tambahkan kondisi WHERE
 if (!empty($searchTerm)) {
+    // Cari berdasarkan nama lengkap ATAU username
     $sql .= " WHERE (u.nama_lengkap LIKE ? OR u.username LIKE ?)";
     $params[] = '%' . $searchTerm . '%';
     $params[] = '%' . $searchTerm . '%';
 }
+
 $sql .= " ORDER BY u.id ASC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $users = $stmt->fetchAll();
-$clientsStmt = $pdo->query("SELECT id, nama FROM clients ORDER BY nama ASC");
-$clients = $clientsStmt->fetchAll();
 ?>
 
 <div class="page-header">
@@ -41,11 +50,10 @@ $clients = $clientsStmt->fetchAll();
         
         <div class="search-bar" style="margin-top: 0; margin-bottom: 20px;">
             <form action="users.php" method="GET" style="display: flex; flex: 1; gap: 15px;">
-                <input type="text" name="search" placeholder="Cari User" value="<?= htmlspecialchars($searchTerm) ?>" />
+                <input type="text" name="search" placeholder="Cari berdasarkan nama atau username..." value="<?= htmlspecialchars($searchTerm) ?>" />
                 <button type="submit" class="btn"><i class="fas fa-search"></i> Cari</button>
             </form>
-            
-            <button class="btn" onclick="showUserForm(null, clients)"><i class="fas fa-user-plus"></i> Add User</button>
+            <button class="btn" onclick="showUserForm(null)"><i class="fas fa-user-plus"></i> Tambah Pengguna</button>
         </div>
         
         <div class="user-management">
@@ -62,7 +70,13 @@ $clients = $clientsStmt->fetchAll();
                     <?php if (empty($users)): ?>
                         <tr>
                             <td colspan="4">
-                                <div class="info" style="margin: 0; box-shadow: none;">Tidak ada pengguna yang ditemukan dengan kata kunci "<?= htmlspecialchars($searchTerm) ?>".</div>
+                                <div class="info" style="margin: 0; box-shadow: none;">
+                                    <?php if (!empty($searchTerm)): ?>
+                                        Tidak ada pengguna yang ditemukan dengan kata kunci "<?= htmlspecialchars($searchTerm) ?>".
+                                    <?php else: ?>
+                                        Tidak ada pengguna di dalam sistem.
+                                    <?php endif; ?>
+                                </div>
                             </td>
                         </tr>
                     <?php else: ?>
@@ -77,12 +91,12 @@ $clients = $clientsStmt->fetchAll();
                                     <?php endif; ?>
                                 </td>
                                 <td>
-                                    <button class="btn" onclick='showUserForm(<?= json_encode($user) ?>, clients)'><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="btn" onclick='showUserForm(<?= json_encode($user) ?>)'><i class="fas fa-edit"></i> Edit</button>
                                     <form action="action.php" method="POST" style="display: inline;" onsubmit="return confirm('Apakah Anda yakin ingin menghapus pengguna ini?');">
                                         <input type="hidden" name="form_action" value="delete_user">
                                         <input type="hidden" name="user_id" value="<?= $user['id'] ?>">
                                         <button type="submit" class="btn btn-danger" <?= ($user['id'] == $_SESSION['user_id']) ? 'disabled title="Tidak bisa menghapus akun Anda sendiri"' : '' ?>>
-                                            <i class="fas fa-trash"></i>
+                                            <i class="fas fa-trash"></i> Hapus
                                         </button>
                                     </form>
                                 </td>
@@ -94,10 +108,6 @@ $clients = $clientsStmt->fetchAll();
         </div>
     </div>
 </div>
-
-<script>
-    const clients = <?= json_encode($clients) ?>;
-</script>
 
 <?php
 require_once 'templates/footer.php';

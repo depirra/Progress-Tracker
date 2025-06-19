@@ -1,5 +1,6 @@
 <?php
 // config/database.php
+
 $host = 'localhost';
 $dbname = 'sinar_baja_bumi';
 $user = 'root'; // Ganti jika username database Anda berbeda
