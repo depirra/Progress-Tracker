@@ -32,7 +32,7 @@ if (isset($_POST['form_action'])) {
                 
                 header('Location: dashboard.php');
             } else {
-                header('Location: login.php?error=1');
+                header('Location: index.php?error=1');
             }
             break;
             
