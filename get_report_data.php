@@ -1,5 +1,4 @@
 <?php
-// File: get_report_data.php (Versi Diperbarui)
 
 require('config/database.php');
 header('Content-Type: application/json');
@@ -26,14 +25,13 @@ if (!$project) {
     exit();
 }
 
-// PERUBAHAN: Ambil juga data lampiran (attachments) yang terkait
-$attachmentStmt = $pdo->prepare("SELECT filename, note, DATE_FORMAT(uploaded_at, '%Y-%m-%d') as tanggal FROM attachments WHERE project_id = ? ORDER BY uploaded_at DESC");
-$attachmentStmt->execute([$projectId]);
-$attachments = $attachmentStmt->fetchAll();
+// Ambil data lampiran (attachments) yang terkait
+// Ambil data lampiran (attachments) yang terkait
+$attachmentsStmt = $pdo->prepare("SELECT * FROM attachments WHERE project_id = ?");
+$attachmentsStmt->execute([$projectId]); // ← perbaiki variable ID
+$attachments = $attachmentsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Tambahkan data lampiran ke dalam data proyek
 $project['attachments'] = $attachments;
 
-// Kirim semua data sebagai satu paket JSON
 echo json_encode($project);
 ?>

@@ -2,15 +2,40 @@
 require_once 'config/database.php';
 require_once 'templates/header.php';
 
-// Logika untuk mengambil data dari database
-$totalProjects = $pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
-$ongoingProjects = $pdo->query("SELECT COUNT(*) FROM projects WHERE progress < 100")->fetchColumn();
-$completedProjects = $pdo->query("SELECT COUNT(*) FROM projects WHERE progress = 100")->fetchColumn();
+$role = $_SESSION['role'];
+$clientId = $_SESSION['client_id'] ?? null;
 
-// Menghitung progress rata-rata
-$avgProgressQuery = $pdo->query("SELECT AVG(progress) as avg_progress FROM projects");
-$avgProgressResult = $avgProgressQuery->fetch();
-$avgProgress = $avgProgressResult ? round($avgProgressResult['avg_progress']) : 0;
+if ($role === 'client') {
+    // Total projects by client
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ?");
+    $stmt->execute([$clientId]);
+    $totalProjects = $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ? AND progress < 100");
+    $stmt->execute([$clientId]);
+    $ongoingProjects = $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM projects WHERE client_id = ? AND progress = 100");
+    $stmt->execute([$clientId]);
+    $completedProjects = $stmt->fetchColumn();
+
+    $stmt = $pdo->prepare("SELECT AVG(progress) FROM projects WHERE client_id = ?");
+$stmt->execute([$clientId]);
+$avgProgressResult = $stmt->fetch();
+$avgProgress = isset($avgProgressResult[0]) && $avgProgressResult[0] !== null
+    ? round($avgProgressResult[0])
+    : 0;
+
+} else {
+    // Untuk admin atau engineer: tampilkan semua
+    $totalProjects = $pdo->query("SELECT COUNT(*) FROM projects")->fetchColumn();
+    $ongoingProjects = $pdo->query("SELECT COUNT(*) FROM projects WHERE progress < 100")->fetchColumn();
+    $completedProjects = $pdo->query("SELECT COUNT(*) FROM projects WHERE progress = 100")->fetchColumn();
+
+    $avgProgressQuery = $pdo->query("SELECT AVG(progress) as avg_progress FROM projects");
+    $avgProgressResult = $avgProgressQuery->fetch();
+    $avgProgress = $avgProgressResult ? round($avgProgressResult['avg_progress']) : 0;
+}
 ?>
 
 <div class="view active" id="dashboard">
@@ -43,6 +68,6 @@ $avgProgress = $avgProgressResult ? round($avgProgressResult['avg_progress']) : 
     </div>
 </div>
 <?php
-// PASTIKAN BARIS INI TERTULIS DENGAN BENAR
+
 require_once 'templates/footer.php';
 ?>

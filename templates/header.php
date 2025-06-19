@@ -1,5 +1,4 @@
 <?php
-// File: templates/header.php (Versi Link Langsung)
 session_start();
 
 if (!isset($_SESSION['user_id']) && basename($_SERVER['PHP_SELF']) != 'login.php') {

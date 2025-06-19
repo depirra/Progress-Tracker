@@ -1,5 +1,4 @@
 <?php
-// File: pages/about.php (Versi Final dengan Card Kontak)
 
 require_once 'templates/header.php';
 ?>

@@ -1,27 +1,17 @@
 <?php
-// File: projects.php (Versi Final Lengkap)
 
 require_once 'config/database.php';
 require_once 'templates/header.php';
 
-// ==================================================================
-// BAGIAN 1: DEFINISIKAN HAK AKSES
-// ==================================================================
 $role = $_SESSION['role'] ?? 'guest';
 
 $bisa_melihat_semua_proyek = ($role === 'admin' || $role === 'engineer');
 $bisa_menambah_proyek = ($role === 'admin' || $role === 'engineer');
 $bisa_mengedit_dan_hapus = ($role === 'admin' || $role === 'engineer');
 
-// ==================================================================
-// BAGIAN 2: PENGAMBILAN DATA
-// ==================================================================
-
-// Ambil daftar client untuk dropdown di form
 $clientsStmt = $pdo->query("SELECT id, nama FROM clients ORDER BY nama ASC");
 $clients = $clientsStmt->fetchAll();
 
-// Logika untuk filter dan search
 $sql = "SELECT p.*, c.nama as client_name FROM projects p LEFT JOIN clients c ON p.client_id = c.id";
 $conditions = [];
 $params = [];
@@ -99,7 +89,7 @@ $projects = $stmt->fetchAll();
                             </div>
                             <div class="project-actions">
                                 <?php if ($bisa_mengedit_dan_hapus): ?>
-                                    <button class="btn" onclick="showProjectForm(<?= $project['id'] ?>, <?= json_encode($clients) ?>)"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="btn" onclick='showProjectForm(<?= $project['id'] ?>, <?= json_encode($clients) ?>)'><i class="fas fa-edit"></i> Edit</button>
                                     
                                     <form action="action.php" method="POST" style="display: inline;" onsubmit="return confirm('Anda yakin ingin menghapus proyek ini? Tindakan ini tidak bisa dibatalkan.');">
                                         <input type="hidden" name="form_action" value="delete_project">
@@ -113,7 +103,7 @@ $projects = $stmt->fetchAll();
                                 </button>
                             </div>
                         </div>
-                    </div>
+                                </div>
                 <?php endforeach; ?>
             <?php endif; ?>
         </div>

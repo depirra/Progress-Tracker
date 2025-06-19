@@ -1,27 +1,17 @@
 <?php
-// File: pages/users.php (Versi Final dengan Search Bar)
 
-// Memanggil file-file konfigurasi dan template.
 require_once 'config/database.php';
 require_once 'templates/header.php';
 
-// --- BAGIAN 1: GERBANG KEAMANAN ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
     die('<div class="page-header"></div><div class="view active"><div class="view-content"><div class="info">Akses Ditolak. Halaman ini hanya untuk Admin.</div></div></div>');
 }
 
-// ==================================================================
-// BAGIAN 2: LOGIKA PENCARIAN & PENGAMBILAN DATA
-// ==================================================================
-
-// Ambil kata kunci pencarian dari URL, jika ada.
 $searchTerm = $_GET['search'] ?? '';
 
-// Query SQL dasar
 $sql = "SELECT u.*, c.nama as client_name FROM users u LEFT JOIN clients c ON u.client_id = c.id";
 $params = [];
 
-// Jika ada kata kunci pencarian, tambahkan kondisi WHERE
 if (!empty($searchTerm)) {
     // Cari berdasarkan nama lengkap ATAU username
     $sql .= " WHERE (u.nama_lengkap LIKE ? OR u.username LIKE ?)";

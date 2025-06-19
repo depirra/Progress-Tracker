@@ -1,10 +1,8 @@
 <?php
-// config/database.php
-
 $host = 'localhost';
 $dbname = 'sinar_baja_bumi';
-$user = 'root'; // Ganti jika username database Anda berbeda
-$pass = '';     // Ganti jika Anda menggunakan password untuk database
+$user = 'root'; 
+$pass = '';     
 
 $dsn = "mysql:host=$host;dbname=$dbname;charset=utf8mb4";
 $options = [
@@ -16,8 +14,6 @@ $options = [
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
 } catch (\PDOException $e) {
-    // Pada production, jangan tampilkan error detail ke user
-    // Cukup catat di log server
     die("Koneksi ke database gagal: " . $e->getMessage());
 }
 ?>

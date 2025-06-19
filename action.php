@@ -1,23 +1,16 @@
 <?php
-// File: action.php (Versi Final Lengkap - Mencakup Semua Fitur)
-
 require_once 'config/database.php';
 session_start();
 
-// Keamanan dasar: Pastikan user sudah login untuk melakukan aksi, kecuali untuk aksi login itu sendiri.
 if (!isset($_SESSION['user_id']) && (!isset($_POST['form_action']) || $_POST['form_action'] !== 'login_user')) {
     die('Akses ditolak. Silakan login terlebih dahulu.');
 }
 
-// Pastikan ada aksi yang dikirim dari form
 if (isset($_POST['form_action'])) {
     $action = $_POST['form_action'];
 
     switch ($action) {
         
-        // ==========================================================
-        // AKSI LOGIN
-        // ==========================================================
         case 'login_user':
             $username = $_POST['username'];
             $password = $_POST['password'];
@@ -26,14 +19,13 @@ if (isset($_POST['form_action'])) {
             $stmt->execute([$username]);
             $user = $stmt->fetch();
 
-            // Menggunakan perbandingan teks biasa sesuai keputusan kita untuk tugas kuliah
             if ($user && $password === $user['password']) {
-                // Simpan data user ke session
+
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['nama_lengkap'] = $user['nama_lengkap'];
                 $_SESSION['role'] = $user['role'];
                 
-                // Jika yang login adalah client, simpan juga client_id-nya
+                
                 if ($user['role'] === 'client') {
                     $_SESSION['client_id'] = $user['client_id'];
                 }
@@ -43,66 +35,88 @@ if (isset($_POST['form_action'])) {
                 header('Location: login.php?error=1');
             }
             break;
-
-        // ==========================================================
-        // AKSI-AKSI PROYEK
-        // ==========================================================
-        case 'save_project':
-            if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'engineer')) {
-                
-                $pdo->beginTransaction();
-                try {
-                    $title = $_POST['projectTitle'];
-                    $detail = $_POST['projectDetail'];
-                    $status = $_POST['statusInput'];
-                    $client_id = !empty($_POST['client_id']) ? $_POST['client_id'] : null;
-                    $projectId = $_POST['projectId'] ?? null;
-                    $progressMap = ["Perencanaan" => 10, "Persiapan" => 30, "Produksi" => 60, "Pengawasan" => 75, "Penyelesaian" => 100];
-                    $progress = $progressMap[$status] ?? 0;
-                    $currentProjectId = null;
-
-                    if ($projectId) { // UPDATE PROYEK LAMA
-                        $sql = "UPDATE projects SET title = ?, detail = ?, status = ?, progress = ?, client_id = ? WHERE id = ?";
-                        $stmt = $pdo->prepare($sql);
-                        $stmt->execute([$title, $detail, $status, $progress, $client_id, $projectId]);
-                        $currentProjectId = $projectId;
-                    } else { // INSERT PROYEK BARU
-                        $created_by = $_SESSION['user_id'];
-                        $sql = "INSERT INTO projects (title, detail, status, progress, created_by, client_id) VALUES (?, ?, ?, ?, ?, ?)";
-                        $stmt = $pdo->prepare($sql);
-                        $stmt->execute([$title, $detail, $status, $progress, $created_by, $client_id]);
-                        $currentProjectId = $pdo->lastInsertId();
-                    }
-
-                    // Logika untuk upload file lampiran
-                    if (isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0) {
+            
+            case 'save_project':
+                if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'engineer')) {
+                    
+                    $pdo->beginTransaction();
+                    try {
+                        $title = $_POST['projectTitle'];
+                        $detail = $_POST['projectDetail'];
+                        $status = $_POST['statusInput'];
+                        $client_id = !empty($_POST['client_id']) ? $_POST['client_id'] : null;
+                        $projectId = $_POST['projectId'] ?? null;
+                        $progressMap = ["Perencanaan" => 10, "Persiapan" => 30, "Produksi" => 60, "Pengawasan" => 75, "Penyelesaian" => 100];
+                        $progress = $progressMap[$status] ?? 0;
+                        $currentProjectId = null;
+            
+                        if ($projectId) { // UPDATE PROYEK LAMA
+                            $sql = "UPDATE projects SET title = ?, detail = ?, status = ?, progress = ?, client_id = ? WHERE id = ?";
+                            $stmt = $pdo->prepare($sql);
+                            $stmt->execute([$title, $detail, $status, $progress, $client_id, $projectId]);
+                            $currentProjectId = $projectId;
+                        } else { // INSERT PROYEK BARU
+                            $created_by = $_SESSION['user_id'];
+                            $sql = "INSERT INTO projects (title, detail, status, progress, created_by, client_id) VALUES (?, ?, ?, ?, ?, ?)";
+                            $stmt = $pdo->prepare($sql);
+                            $stmt->execute([$title, $detail, $status, $progress, $created_by, $client_id]);
+                            $currentProjectId = $pdo->lastInsertId();
+                        }
+            
+                        // PERBAIKAN: Upload file lampiran - bagian ini yang perlu diperbaiki
                         $note = $_POST['attachment_note'] ?? '';
-                        $uploaded_by = $_SESSION['user_id'];
+                        $uploaded_by = $_SESSION['user_id']; // Tambahkan ini
                         $target_dir = "uploads/";
-                        if (!is_dir($target_dir)) { mkdir($target_dir, 0755, true); }
+                        if (!is_dir($target_dir)) { 
+                            mkdir($target_dir, 0755, true); 
+                        }
+            
+                        $hasFile = isset($_FILES['attachment_file']) && $_FILES['attachment_file']['error'] == 0;
+                        $original_name = null;
+                        $target_file = null;
+            
+                        if ($hasFile) {
+                            $original_name = basename($_FILES["attachment_file"]["name"]);
+                            $file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
+                            $allowed_formats = ['jpg', 'jpeg', 'png', 'gif']; // PERBAIKAN: Gunakan array yang konsisten
+                            
+                            if (!in_array($file_extension, $allowed_formats)) {
+                                throw new Exception("Format file tidak diizinkan.");
+                            }
+            
+                            $safe_filename = preg_replace('/[^A-Za-z0-9\-\._]/', '', pathinfo($original_name, PATHINFO_FILENAME));
+                            $unique_filename = $safe_filename . '-' . uniqid() . '.' . $file_extension;
+                            $target_file = $target_dir . $unique_filename;
+            
+                            if (!move_uploaded_file($_FILES["attachment_file"]["tmp_name"], $target_file)) {
+                                throw new Exception("Gagal mengupload file.");
+                            }
+                        }
+            
+                        // PERBAIKAN: Simpan attachment dengan kolom yang benar
+                        if (!empty($note) || $hasFile) {
+                            $stmtAttachment = $pdo->prepare("
+                                INSERT INTO attachments (project_id, filename, filepath, note, uploaded_by, tanggal)
+                                VALUES (?, ?, ?, ?, ?, NOW())
+                            ");
+                            $stmtAttachment->execute([
+                                $currentProjectId,
+                                $hasFile ? $original_name : null,
+                                $hasFile ? $target_file : null,
+                                $note,
+                                $uploaded_by
+                            ]);
+                        }
+            
+                        $pdo->commit();
                         
-                        $original_name = basename($_FILES["attachment_file"]["name"]);
-                        $file_extension = strtolower(pathinfo($original_name, PATHINFO_EXTENSION));
-                        $allowed_formats = ['jpg', 'jpeg', 'png', 'gif'];
-                        if (!in_array($file_extension, $allowed_formats)) { throw new Exception("Format file tidak diizinkan."); }
-
-                        $safe_filename = preg_replace('/[^A-Za-z0-9\-\._]/', '', pathinfo($original_name, PATHINFO_FILENAME));
-                        $unique_filename = $safe_filename . '-' . uniqid() . '.' . $file_extension;
-                        $target_file = $target_dir . $unique_filename;
-
-                        if (move_uploaded_file($_FILES["attachment_file"]["tmp_name"], $target_file)) {
-                            $stmtAttachment = $pdo->prepare("INSERT INTO attachments (project_id, filename, filepath, note, uploaded_by) VALUES (?, ?, ?, ?, ?)");
-                            $stmtAttachment->execute([$currentProjectId, $original_name, $target_file, $note, $uploaded_by]);
-                        } else { throw new Exception("Gagal mengupload file."); }
+                    } catch (Exception $e) {
+                        $pdo->rollBack();
+                        die("Terjadi kesalahan saat menyimpan proyek: " . $e->getMessage());
                     }
-                    $pdo->commit();
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    die("Terjadi kesalahan saat menyimpan proyek: " . $e->getMessage());
                 }
-            }
-            header('Location: projects.php');
-            break;
+                header('Location: projects.php');
+                break;
 
         case 'delete_project':
             if (isset($_SESSION['role']) && ($_SESSION['role'] === 'admin' || $_SESSION['role'] === 'engineer')) {
@@ -132,9 +146,6 @@ if (isset($_POST['form_action'])) {
             header('Location: projects.php');
             break;
 
-        // ==========================================================
-        // AKSI-AKSI PENGGUNA
-        // ==========================================================
         case 'save_user':
             if (isset($_SESSION['role']) && $_SESSION['role'] === 'admin') {
                 $userId = $_POST['user_id'] ?? null;
@@ -191,12 +202,10 @@ if (isset($_POST['form_action'])) {
             header('Location: users.php');
             break;
 
-        // Aksi default
         default:
             header('Location: dashboard.php');
             break;
     }
-    // Hentikan eksekusi setelah redirect
     exit();
 }
 ?>
