@@ -9,15 +9,18 @@ function toggleSidebar() {
 
 function hideForm(formId) {
   document.getElementById(formId).classList.remove("active");
+  const overlay = document.getElementById("overlay");
+  if (overlay) overlay.classList.remove("active");
 }
 
 function showProjectForm(projectId = null, clientList = []) {
   const formContainer = document.getElementById("projectForm");
+  const overlay = document.getElementById("overlay");
   const isEdit = projectId !== null;
 
   formContainer.innerHTML =
     '<h3><i class="fas fa-spinner fa-spin"></i> Memuat data...</h3>';
-  overlay.classList.add("active");
+  if (overlay) overlay.classList.add("active");
   formContainer.classList.add("active");
 
   const buildAndShowForm = (projectData = {}) => {
@@ -137,8 +140,8 @@ function showProjectForm(projectId = null, clientList = []) {
                           <small style="color: #666;">Catatan wajib diisi. File gambar bersifat opsional.</small>
                       </div>
                       <div class="form-group">
-                          <label for="attachment_file">Pilih File Gambar (Opsional)</label>
-                          <input type="file" name="attachment_file" id="attachment_file" accept="image/png, image/jpeg, image/gif">
+                          <label for="attachment_file">Lampirkan File</label>
+                          <input type="file" name="attachment_file" id="attachment_file" accept=".png, .jpg, .jpeg, .pdf">
                           <small style="color: #666;">Kosongkan jika hanya ingin menambahkan catatan.</small>
                       </div>
                   </div>
@@ -170,6 +173,80 @@ function showProjectForm(projectId = null, clientList = []) {
   } else {
     buildAndShowForm();
   }
+}
+
+function showUserForm(userData = null) {
+  const formContainer = document.getElementById("userForm");
+  const overlay = document.getElementById("overlay");
+  const isEdit = userData !== null;
+
+  formContainer.innerHTML =
+    '<h3><i class="fas fa-spinner fa-spin"></i> Memuat data...</h3>';
+  if (overlay) overlay.classList.add("active");
+  formContainer.classList.add("active");
+
+  const buildAndShowForm = () => {
+    const formHTML = `
+      <button class="close-btn" onclick="hideForm('userForm')">&times;</button>
+      <h3>${isEdit ? "Edit Pengguna" : "Tambah Pengguna Baru"}</h3>
+      <form action="action.php" method="POST">
+        <input type="hidden" name="form_action" value="save_user">
+        ${
+          isEdit
+            ? `<input type="hidden" name="user_id" value="${userData.id}">`
+            : ""
+        }
+
+        <div class="form-group">
+          <label for="nama_lengkap">Nama Lengkap</label>
+          <input type="text" name="nama_lengkap" value="${
+            isEdit ? userData.nama_lengkap : ""
+          }" required>
+        </div>
+
+        <div class="form-group">
+          <label for="username">Username</label>
+          <input type="text" name="username" value="${
+            isEdit ? userData.username : ""
+          }" required>
+        </div>
+
+        <div class="form-group">
+          <label for="role">Role</label>
+          <select name="role" required>
+            <option value="">-- Pilih Role --</option>
+            <option value="admin" ${
+              isEdit && userData.role === "admin" ? "selected" : ""
+            }>Admin</option>
+            <option value="engineer" ${
+              isEdit && userData.role === "engineer" ? "selected" : ""
+            }>Engineer</option>
+            <option value="client" ${
+              isEdit && userData.role === "client" ? "selected" : ""
+            }>Client</option>
+          </select>
+        </div>
+
+        ${
+          !isEdit
+            ? `
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" name="password" required>
+        </div>
+        `
+            : ""
+        }
+
+        <button type="submit" class="save-btn">${
+          isEdit ? "Simpan Perubahan" : "Tambah Pengguna"
+        }</button>
+      </form>
+    `;
+    formContainer.innerHTML = formHTML;
+  };
+
+  buildAndShowForm();
 }
 
 function showReportConfirmation(projectId) {

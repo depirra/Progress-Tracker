@@ -1,5 +1,4 @@
 <?php
-
 require_once 'config/database.php';
 require_once 'templates/header.php';
 
@@ -13,7 +12,6 @@ $sql = "SELECT u.*, c.nama as client_name FROM users u LEFT JOIN clients c ON u.
 $params = [];
 
 if (!empty($searchTerm)) {
-    // Cari berdasarkan nama lengkap ATAU username
     $sql .= " WHERE (u.nama_lengkap LIKE ? OR u.username LIKE ?)";
     $params[] = '%' . $searchTerm . '%';
     $params[] = '%' . $searchTerm . '%';
@@ -35,17 +33,18 @@ $users = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
 <div class="view active" id="users">
     <div class="view-content">
-        
+
         <div class="search-bar" style="margin-top: 0; margin-bottom: 20px;">
             <form action="users.php" method="GET" style="display: flex; flex: 1; gap: 15px;">
-                <input type="text" name="search" placeholder="Cari berdasarkan nama atau username..." value="<?= htmlspecialchars($searchTerm) ?>" />
+                <input type="text" name="search" id="search" placeholder="Cari berdasarkan nama atau username..." value="<?= htmlspecialchars($searchTerm) ?>" autocomplete="off" />
                 <button type="submit" class="btn"><i class="fas fa-search"></i> Cari</button>
             </form>
             <button class="btn" onclick="showUserForm(null)"><i class="fas fa-user-plus"></i> Tambah Pengguna</button>
         </div>
-        
+
         <div class="user-management">
             <table class="user-table">
                 <thead>
@@ -99,6 +98,8 @@ $users = $stmt->fetchAll();
     </div>
 </div>
 
-<?php
-require_once 'templates/footer.php';
-?>
+<!-- Modal dan Overlay -->
+<div id="overlay" class="overlay"></div>
+<div id="userForm" class="form-container"></div>
+
+<?php require_once 'templates/footer.php'; ?>

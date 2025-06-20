@@ -59,7 +59,7 @@ $projects = $stmt->fetchAll();
             </form>
             
             <?php if ($bisa_menambah_proyek): ?>
-                <button class="btn" id="addProjectBtn" onclick='showProjectForm(null, <?= json_encode($clients) ?>)'><i class="fas fa-plus"></i> Add Project</button>
+                <button class="btn" id="addProjectBtn" onclick='showProjectForm(null, <?= json_encode($clients) ?>)'><i class="fas fa-plus"></i> Tambah Projek</button>
             <?php endif; ?>
         </div>
 
